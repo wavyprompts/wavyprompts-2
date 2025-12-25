@@ -164,17 +164,13 @@
         MoreHorizontal, Check, Pencil, Search, Sparkles, Loader2, AlertTriangle, Trash2, Upload, Link as LinkIcon, Info, XCircle, CheckCircle2,
         Database, Terminal, Calendar
       } from "https://esm.sh/lucide-react@0.263.1";
-      // Import Lenis (New Package Name)
       import Lenis from "https://esm.sh/lenis@1.1.14";
       import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
-      // --- SUPABASE CONFIGURATION ---
       const SUPABASE_URL = 'https://wkxmzwvysahrczxbesgk.supabase.co';
       const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndreG16d3Z5c2FocmN6eGJlc2drIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjU3OTUwMTcsImV4cCI6MjA4MTM3MTAxN30.m7GZaKsWT9KhvAU3dR88cSbVwtK1_FTUM1QL4cf8PN0';
-      
       const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
-      // --- SQL FIX SCRIPT ---
       const REPAIR_SQL = `
 -- 1. RESET PROMPTS TABLE
 create table if not exists public.prompts (
@@ -185,179 +181,81 @@ create table if not exists public.prompts (
     category text default 'NanoBanana',
     created_at timestamptz default now()
 );
-
--- Ensure columns exist
 alter table public.prompts add column if not exists category text default 'NanoBanana';
 alter table public.prompts add column if not exists created_at timestamptz default now();
-
--- Fix Table Permissions (RLS)
 alter table public.prompts enable row level security;
-drop policy if exists "Enable all access" on public.prompts;
 drop policy if exists "Public Access" on public.prompts;
 create policy "Public Access" on public.prompts for all using (true) with check (true);
 grant all on table public.prompts to anon;
 grant all on table public.prompts to authenticated;
 
--- 2. FIX STORAGE (Fixes "Permission Denied" errors)
+-- 2. FIX STORAGE
 insert into storage.buckets (id, name, public) values ('images', 'images', true)
 on conflict (id) do update set public = true;
-
--- Remove conflicting policies
 drop policy if exists "Universal Public Images" on storage.objects;
-drop policy if exists "Give me access" on storage.objects;
-drop policy if exists "Public Access" on storage.objects;
-
--- Create UNIVERSAL open policy
 create policy "Universal Public Images" on storage.objects for all 
 using ( bucket_id = 'images' ) 
 with check ( bucket_id = 'images' );
-
--- Explicit grants
 grant all on table storage.objects to anon;
 grant all on table storage.objects to authenticated;
 `.trim();
 
-      // --- TOAST CONTEXT ---
       const ToastContext = createContext(null);
-
       const ToastProvider = ({ children }) => {
         const [toasts, setToasts] = useState([]);
-
         const addToast = (message, type = 'success', duration = 5000) => {
           const id = Date.now();
           setToasts(prev => [...prev, { id, message, type }]);
           setTimeout(() => removeToast(id), duration);
         };
-
-        const removeToast = (id) => {
-          setToasts(prev => prev.filter(t => t.id !== id));
-        };
-
+        const removeToast = (id) => setToasts(prev => prev.filter(t => t.id !== id));
         return (
           <ToastContext.Provider value={{ addToast }}>
             {children}
             <div className="fixed bottom-6 left-1/2 -translate-x-1/2 md:translate-x-0 md:left-auto md:bottom-6 md:right-6 z-[200] flex flex-col gap-3 pointer-events-none w-full max-w-[calc(100%-32px)] md:max-w-sm">
               {toasts.map(toast => (
-                <div 
-                  key={toast.id} 
-                  className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-2xl animate-in slide-in-from-bottom-full md:slide-in-from-right-full fade-in duration-300 w-full ${
-                    toast.type === 'error' 
-                      ? 'bg-red-500/10 border-red-500/20 text-red-200' 
-                      : 'bg-[#1a1a1a]/90 border-white/10 text-white'
-                  }`}
-                >
-                  <div className={`shrink-0 ${toast.type === 'error' ? 'text-red-400' : 'text-[#547EAE]'}`}>
-                    {toast.type === 'error' ? <XCircle size={20} /> : <CheckCircle2 size={20} />}
-                  </div>
+                <div key={toast.id} className={`pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-xl border backdrop-blur-md shadow-2xl animate-in slide-in-from-bottom-full md:slide-in-from-right-full fade-in duration-300 w-full ${toast.type === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-200' : 'bg-[#1a1a1a]/90 border-white/10 text-white'}`}>
+                  <div className={`shrink-0 ${toast.type === 'error' ? 'text-red-400' : 'text-[#547EAE]'}`}><CheckCircle2 size={20} /></div>
                   <p className="text-sm font-medium leading-tight">{toast.message}</p>
-                  <button onClick={() => removeToast(toast.id)} className="ml-auto opacity-50 hover:opacity-100 transition-opacity p-1">
-                    <X size={14} />
-                  </button>
+                  <button onClick={() => removeToast(toast.id)} className="ml-auto opacity-50 hover:opacity-100 transition-opacity p-1"><X size={14} /></button>
                 </div>
               ))}
             </div>
           </ToastContext.Provider>
         );
       };
+      const useToast = () => useContext(ToastContext);
 
-      const useToast = () => {
-        const context = useContext(ToastContext);
-        if (!context) throw new Error("useToast must be used within a ToastProvider");
-        return context;
-      };
-
-      // Data Mapping Helpers
       const mapFromDb = (row) => ({
-        id: row.id,
-        title: row.title,
-        prompt: row.prompt,
-        imageUrl: row.image_url,
-        category: row.category,
-        createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now()
+        id: row.id, title: row.title, prompt: row.prompt, imageUrl: row.image_url, category: row.category, createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now()
       });
-
       const mapToDb = (data) => ({
-        id: data.id,
-        title: data.title,
-        prompt: data.prompt,
-        image_url: data.imageUrl,
-        category: data.category,
-        created_at: new Date(data.createdAt).toISOString()
+        id: data.id, title: data.title, prompt: data.prompt, image_url: data.imageUrl, category: data.category, created_at: new Date(data.createdAt).toISOString()
       });
 
-      // API Functions
       const fetchPrompts = async () => {
-        const { data, error } = await supabase
-          .from('prompts')
-          .select('*')
-          .order('created_at', { ascending: false });
-        
+        const { data, error } = await supabase.from('prompts').select('*').order('created_at', { ascending: false });
         if (error) throw error;
         return data.map(mapFromDb);
       };
-
       const checkDatabaseHealth = async () => {
         try {
-          const { data, error } = await supabase.from('prompts').select('id, category').limit(1);
-          if (error) throw error;
-          return { healthy: true };
-        } catch (error) {
-           return { healthy: false, error: error.message };
-        }
+          const { data, error } = await supabase.from('prompts').select('id').limit(1);
+          return { healthy: !error, error: error?.message };
+        } catch (e) { return { healthy: false, error: e.message }; }
       };
-
       const uploadImageToSupabase = async (file) => {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${fileExt}`;
-        const filePath = `${fileName}`;
-
-        const { data, error: uploadError } = await supabase.storage
-          .from('images')
-          .upload(filePath, file, { cacheControl: '3600', upsert: false });
-
-        if (uploadError) {
-          console.error("Storage upload error:", uploadError);
-          if (uploadError.statusCode === '403' || uploadError.error === 'Unauthorized' || uploadError.message.includes('row-level security')) {
-            throw new Error("Storage Permission Denied. Run the repair script.");
-          }
-          throw uploadError;
-        }
-
-        const { data: publicUrlData } = supabase.storage.from('images').getPublicUrl(filePath);
-        return publicUrlData.publicUrl;
-      };
-
-      const savePromptToSupabase = async (prompt) => {
-        const dbPayload = mapToDb(prompt);
-        const { error } = await supabase.from('prompts').upsert(dbPayload, { onConflict: 'id' });
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2, 9)}.${file.name.split('.').pop()}`;
+        const { data, error } = await supabase.storage.from('images').upload(fileName, file);
         if (error) throw error;
+        return supabase.storage.from('images').getPublicUrl(fileName).data.publicUrl;
       };
-
-      const deletePromptFromSupabase = async (id) => {
-        const { error } = await supabase.from('prompts').delete().eq('id', id);
-        if (error) throw error;
-      };
-
-      const encodeShareData = (data) => {
-        try {
-          const payload = { ...data };
-          const json = JSON.stringify(payload);
-          return btoa(String.fromCharCode(...new TextEncoder().encode(json)));
-        } catch (e) { return ""; }
-      };
-
-      const decodeShareData = (encoded) => {
-        try {
-          const binaryString = atob(encoded);
-          const bytes = Uint8Array.from(binaryString, c => c.charCodeAt(0));
-          return JSON.parse(new TextDecoder().decode(bytes));
-        } catch (e) { return null; }
-      };
-
-      // Components
+      const savePromptToSupabase = async (p) => { await supabase.from('prompts').upsert(mapToDb(p)); };
+      const deletePromptFromSupabase = async (id) => { await supabase.from('prompts').delete().eq('id', id); };
+      const encodeShareData = (d) => btoa(unescape(encodeURIComponent(JSON.stringify(d))));
+      const decodeShareData = (e) => { try { return JSON.parse(decodeURIComponent(escape(atob(e)))); } catch { return null; } };
 
       const Button = ({ children, variant = 'primary', fullWidth = false, className = '', ...props }) => {
-        const baseStyles = "inline-flex items-center justify-center transition-all duration-200 font-medium tracking-wide disabled:opacity-50 disabled:cursor-not-allowed select-none active:scale-[0.98]";
         const variants = {
           primary: "bg-[#547EAE] hover:bg-[#4a4aff] text-white rounded-full px-6 py-3 shadow-[0_0_20px_-5px_#547EAE]",
           secondary: "bg-white text-black hover:bg-gray-200 rounded-full px-6 py-3",
@@ -365,123 +263,46 @@ grant all on table storage.objects to authenticated;
           icon: "bg-white/10 hover:bg-white/20 text-white rounded-full p-2 backdrop-blur-md",
           danger: "bg-red-500/10 hover:bg-red-500/20 text-red-400 hover:text-red-300 rounded-full px-4 py-3 border border-red-500/20"
         };
-        return <button className={`${baseStyles} ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${className}`} {...props}>{children}</button>;
+        return <button className={`inline-flex items-center justify-center transition-all duration-200 font-medium tracking-wide disabled:opacity-50 select-none active:scale-[0.98] ${variants[variant]} ${fullWidth ? 'w-full' : ''} ${className}`} {...props}>{children}</button>;
       };
 
       const HeroSection = ({ prompts }) => {
-        // Use real prompts or fallbacks. Ensure we have enough to fill columns nicely.
         const pool = prompts && prompts.length > 0 ? prompts : Array.from({length: 12}).fill(null);
-        // Duplicate pool to ensure enough items for scrolling effect
-        const items = [...pool, ...pool, ...pool, ...pool].slice(0, 36); 
-        
-        // Create 6 columns
-        const cols = [[], [], [], [], [], []];
-        items.forEach((item, i) => {
-            cols[i % 6].push(item);
-        });
-
+        const items = [...pool, ...pool, ...pool, ...pool, ...pool, ...pool, ...pool, ...pool].slice(0, 80); 
+        const cols = [[], [], [], [], [], [], [], []];
+        items.forEach((item, i) => cols[i % 8].push(item));
         return (
-          <div className="relative w-full h-[400px] md:h-[480px] rounded-[32px] overflow-hidden mb-12 border border-white/10 shadow-2xl bg-[#0a0a0a] group">
-              {/* Background Columns - Tilted and Animated */}
+          <div className="relative w-full h-[400px] md:h-[480px] rounded-[32px] overflow-hidden mb-12 border border-white/10 shadow-2xl bg-[#0a0a0a]">
               <div className="absolute inset-[-100px] opacity-70 flex gap-4 justify-center items-start transform -rotate-6 scale-110 pointer-events-none select-none">
                   {cols.map((colItems, colIndex) => (
-                      <div 
-                        key={colIndex} 
-                        className="flex flex-col gap-4 w-1/3 sm:w-1/4 md:w-1/6 shrink-0"
-                        style={{
-                            animation: `${colIndex % 2 === 0 ? 'marquee-up' : 'marquee-down'} ${40 + (colIndex * 5)}s linear infinite`
-                        }}
-                      >
-                          {/* Render items twice for seamless loop */}
+                      <div key={colIndex} className="flex flex-col gap-4 shrink-0" style={{ width: '12.5%', animation: `${colIndex % 2 === 0 ? 'marquee-up' : 'marquee-down'} ${35 + (colIndex * 4)}s linear infinite` }}>
                           {[...colItems, ...colItems].map((p, i) => (
                               <div key={i} className="w-full aspect-[4/5] rounded-xl bg-gray-800/50 overflow-hidden border border-white/5 relative">
-                                 <img 
-                                    src={p ? p.imageUrl : `https://picsum.photos/seed/${colIndex * 100 + i}/400/500`} 
-                                    className="w-full h-full object-cover transition-all duration-700 ease-out" 
-                                    loading="lazy"
-                                    alt=""
-                                 />
+                                 <img src={p ? p.imageUrl : `https://picsum.photos/seed/${colIndex * 100 + i}/400/500`} className="w-full h-full object-cover" loading="lazy" alt="" />
                               </div>
                           ))}
                       </div>
                   ))}
               </div>
-
-              {/* Dark Gradient Overlay for Readability */}
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
-              
-              {/* Content - MODIFIED: Left Aligned and Smaller Size */}
               <div className="absolute inset-0 flex flex-col items-start justify-end z-10 p-8 pb-12 md:pb-16 text-left">
-                   <h1 className="font-display font-black text-3xl md:text-5xl tracking-tighter leading-[0.85] text-white drop-shadow-2xl flex flex-col gap-0 md:gap-1">
-                      <span>STAY WAVY</span>
-                      <span className="text-white/90">PROMPT SMARTER</span>
+                   <h1 className="font-display font-black text-3xl md:text-5xl tracking-tighter leading-[0.85] text-white drop-shadow-2xl flex flex-col">
+                      <span>STAY WAVY</span><span className="text-white/90">PROMPT SMARTER</span>
                    </h1>
-                   <p className="text-white/50 text-[10px] md:text-xs font-medium max-w-xs mt-4 tracking-wide">
-                      Discover and collect the best AI prompts in your personal vault.
-                   </p>
+                   <p className="text-white/50 text-[10px] md:text-xs font-medium max-w-xs mt-4 tracking-wide">Discover and collect AI prompts in your personal vault.</p>
               </div>
-          </div>
-        );
-      };
-
-      const RepairModal = ({ isOpen, onClose, errorMsg }) => {
-        const [copied, setCopied] = useState(false);
-        if (!isOpen) return null;
-
-        const handleCopy = () => {
-          navigator.clipboard.writeText(REPAIR_SQL);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 2000);
-        };
-
-        return (
-          <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
-            <div className="glass-panel w-full max-w-2xl rounded-3xl p-6 md:p-8 relative animate-in fade-in zoom-in-95 duration-200 border border-red-500/30 shadow-[0_0_50px_-10px_rgba(239,68,68,0.2)]">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="p-3 rounded-full bg-red-500/20 text-red-400"><Database size={24} /></div>
-                <div>
-                  <h2 className="text-xl font-bold font-display text-white">Database Setup Required</h2>
-                  <p className="text-red-300 text-sm">Permission or Schema error detected in Supabase</p>
-                </div>
-              </div>
-              
-              <div className="bg-black/40 rounded-xl p-4 mb-6 border border-white/10">
-                <p className="text-white/60 text-sm mb-2 font-mono">Error Details:</p>
-                <code className="text-red-300 text-xs break-all">{errorMsg}</code>
-              </div>
-
-              <p className="text-white/80 mb-4 text-sm">To fix this, copy the SQL code below and run it in your <a href="https://supabase.com/dashboard/project/_/sql" target="_blank" className="text-[#547EAE] hover:underline font-bold">Supabase SQL Editor</a>.</p>
-              
-              <div className="relative group mb-6">
-                <pre className="bg-[#050505] p-4 rounded-xl text-xs text-gray-400 font-mono overflow-x-auto h-48 border border-white/10 shadow-inner">
-                  {REPAIR_SQL}
-                </pre>
-                <button onClick={handleCopy} className="absolute top-2 right-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white text-xs font-bold transition-colors flex items-center gap-2 backdrop-blur-md">
-                  {copied ? <Check size={14} /> : <Copy size={14} />}
-                  {copied ? 'Copied' : 'Copy SQL'}
-                </button>
-              </div>
-
-              <div className="flex justify-end gap-3">
-                <Button variant="ghost" onClick={onClose}>Ignore</Button>
-                <Button onClick={() => window.location.reload()} variant="primary">I've Run It, Reload App</Button>
-              </div>
-            </div>
           </div>
         );
       };
 
       const PromptCard = ({ data, onClick, onEdit }) => {
         const [copied, setCopied] = useState(false);
-        const category = data.category || 'NanoBanana';
         const { addToast } = useToast();
+        const category = data.category || 'NanoBanana';
 
         const handleShare = (e) => {
           e.stopPropagation();
-          const encoded = encodeShareData(data);
-          if (!encoded) return;
-          const url = `${window.location.origin}${window.location.pathname}#/share/${encoded}`;
+          const url = `${window.location.origin}${window.location.pathname}#/share/${encodeShareData(data)}`;
           navigator.clipboard.writeText(url).then(() => {
             setCopied(true);
             addToast("Link copied!");
@@ -490,33 +311,33 @@ grant all on table storage.objects to authenticated;
         };
 
         const getDotColor = (c) => {
-          switch(c) {
-            case 'NanoBanana': return 'bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.5)]';
-            case 'Midjourney': return 'bg-[#00BFFF] shadow-[0_0_8px_rgba(0,191,255,0.5)]';
-            case 'Seedream': return 'bg-[#00FA9A] shadow-[0_0_8px_rgba(0,250,154,0.5)]';
-            default: return 'bg-white';
-          }
+          if (c === 'NanoBanana') return 'bg-[#FFD700]';
+          if (c === 'Midjourney') return 'bg-[#00BFFF]';
+          return 'bg-[#00FA9A]';
         };
 
         return (
-          <div onClick={onClick} className="group cursor-pointer flex flex-col gap-4 active:scale-[0.98] transition-transform duration-200">
-            <div className="relative w-full aspect-[4/5] rounded-[24px] md:rounded-[32px] overflow-hidden border border-white/5 bg-[#050505] z-10 shadow-2xl ring-1 ring-white/5 group-hover:ring-white/10 transition-all duration-500">
+          <div 
+            onClick={onClick} 
+            className="group cursor-pointer flex flex-col gap-4 transition-all duration-300 active:scale-[0.98] animate-in fade-in slide-in-from-bottom-5"
+          >
+            <div className="relative w-full aspect-[4/5] rounded-[28px] overflow-hidden border border-white/5 bg-[#050505] z-10 shadow-xl group-hover:ring-2 ring-white/20 transition-all duration-500">
               {data.imageUrl ? (
-                <img src={data.imageUrl} alt={data.title} className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]" loading="lazy" />
+                <img src={data.imageUrl} alt={data.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.05]" loading="lazy" />
               ) : (
-                <div className="w-full h-full flex flex-col items-center justify-center text-white/20 bg-white/5"><ImageIcon size={48} /></div>
+                <div className="w-full h-full flex items-center justify-center text-white/10 bg-white/5"><ImageIcon size={48} /></div>
               )}
             </div>
-            <div className="flex flex-col gap-2">
-              <h3 className="text-lg md:text-xl font-extrabold font-display text-white tracking-tight truncate px-1">{data.title}</h3>
-              <div className="flex items-center justify-between gap-3 px-1 w-full">
-                <div className="glass-element flex items-center gap-2 px-2.5 py-1.5 md:px-3 md:py-2 rounded-full transition-all duration-300 hover:bg-white/10 border border-white/10">
-                  <div className={`w-1.5 h-1.5 md:w-2 md:h-2 rounded-full flex-shrink-0 ${getDotColor(category)}`}></div>
-                  <span className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-white/90 font-display whitespace-nowrap">{category}</span>
+            <div className="flex flex-col gap-2 px-1">
+              <h3 className="text-xl font-black font-display text-white tracking-tight truncate uppercase">{data.title}</h3>
+              <div className="flex items-center justify-between gap-3">
+                <div className="glass-element flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${getDotColor(category)}`}></div>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-white/70 font-display">{category}</span>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <button onClick={(e) => {e.stopPropagation(); onEdit();}} className="glass-element w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full text-white/70 hover:text-white hover:bg-white/10 transition-all border border-white/10 active:bg-white/20"><Pencil size={15} /></button>
-                  <button onClick={handleShare} className={`glass-element w-9 h-9 md:w-10 md:h-10 flex items-center justify-center rounded-full transition-all border border-white/10 active:bg-white/20 ${copied ? 'bg-white text-black' : 'text-white/70 hover:text-white'}`}>{copied ? <Check size={16} /> : <Share2 size={16} />}</button>
+                <div className="flex items-center gap-2">
+                  <button onClick={(e) => {e.stopPropagation(); onEdit();}} className="glass-element w-9 h-9 flex items-center justify-center rounded-full text-white/50 hover:text-white transition-all border border-white/5"><Pencil size={14} /></button>
+                  <button onClick={handleShare} className={`glass-element w-9 h-9 flex items-center justify-center rounded-full transition-all border border-white/5 ${copied ? 'bg-white text-black' : 'text-white/50 hover:text-white'}`}>{copied ? <Check size={14} /> : <Share2 size={14} />}</button>
                 </div>
               </div>
             </div>
@@ -533,28 +354,15 @@ grant all on table storage.objects to authenticated;
         const [previewUrl, setPreviewUrl] = useState('');
         const [category, setCategory] = useState('NanoBanana');
         const [isSaving, setIsSaving] = useState(false);
-        const [savingStatus, setSavingStatus] = useState('idle');
-        const [isDeleting, setIsDeleting] = useState(false);
         const fileInputRef = useRef(null);
         const { addToast } = useToast();
 
         useEffect(() => {
           if (isOpen) {
-            setSavingStatus('idle');
             if (initialData) {
-              setTitle(initialData.title);
-              setPrompt(initialData.prompt);
-              setImageUrl(initialData.imageUrl);
-              setPreviewUrl(initialData.imageUrl);
-              setImageMode('link');
-              setCategory(initialData.category || 'NanoBanana');
+              setTitle(initialData.title); setPrompt(initialData.prompt); setImageUrl(initialData.imageUrl); setPreviewUrl(initialData.imageUrl); setImageMode('link'); setCategory(initialData.category || 'NanoBanana');
             } else {
-              setTitle('');
-              setPrompt('');
-              setImageUrl('');
-              setPreviewUrl('');
-              setImageMode('upload');
-              setCategory('NanoBanana');
+              setTitle(''); setPrompt(''); setImageUrl(''); setPreviewUrl(''); setImageMode('upload'); setCategory('NanoBanana');
             }
             setSelectedFile(null);
           }
@@ -562,10 +370,7 @@ grant all on table storage.objects to authenticated;
 
         const handleFileChange = (e) => {
           const file = e.target.files[0];
-          if (file) {
-            setSelectedFile(file);
-            setPreviewUrl(URL.createObjectURL(file));
-          }
+          if (file) { setSelectedFile(file); setPreviewUrl(URL.createObjectURL(file)); }
         };
 
         if (!isOpen) return null;
@@ -574,87 +379,45 @@ grant all on table storage.objects to authenticated;
           e.preventDefault();
           if (isSaving) return;
           setIsSaving(true);
-          setSavingStatus('starting');
-          
           try {
-            const baseData = {
-              id: initialData ? initialData.id : Date.now().toString(),
-              title,
-              prompt,
-              imageUrl: imageMode === 'link' ? imageUrl : (initialData?.imageUrl || 'https://picsum.photos/800/1000'),
-              category,
-              createdAt: initialData ? initialData.createdAt : Date.now()
-            };
-
-            const fileToUpload = (imageMode === 'upload' && selectedFile) ? selectedFile : null;
-
-            await onSave(baseData, fileToUpload, (status) => setSavingStatus(status));
-            
+            const baseData = { id: initialData?.id || Date.now().toString(), title, prompt, imageUrl: imageMode === 'link' ? imageUrl : (initialData?.imageUrl || ''), category, createdAt: initialData?.createdAt || Date.now() };
+            await onSave(baseData, (imageMode === 'upload' && selectedFile) ? selectedFile : null);
             addToast(initialData ? "Vault entry updated!" : "Saved to Vault!");
             onClose();
-          } catch (err) {
-             console.error("Modal caught error:", err);
-             addToast(err.message || "Failed to save.", "error");
-          } finally {
-            setIsSaving(false);
-            setSavingStatus('idle');
-          }
+          } catch (err) { addToast(err.message, "error"); } finally { setIsSaving(false); }
         };
 
         return (
           <div className="fixed inset-0 z-[150] flex items-end md:items-center justify-center sm:p-4">
             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={onClose} />
-            <div data-lenis-prevent className="glass-panel w-full md:max-w-lg max-h-[95vh] md:max-h-[90vh] overflow-y-auto rounded-t-3xl md:rounded-3xl p-6 md:p-8 relative animate-in slide-in-from-bottom-full md:slide-in-from-bottom-10 fade-in zoom-in-95 duration-300">
-              <button onClick={onClose} className="absolute top-4 right-4 p-2 text-white/50 hover:text-white transition-colors z-10"><X size={24} /></button>
-              
-              {/* Mobile Drag Handle */}
-              <div className="w-12 h-1.5 bg-white/20 rounded-full mx-auto mb-6 md:hidden"></div>
-
-              <h2 className="text-xl md:text-2xl font-bold font-display mb-6 bg-gradient-to-r from-white to-white/50 bg-clip-text text-transparent">{initialData ? 'Edit Prompt' : 'Add to Vault'}</h2>
-              <form onSubmit={handleSubmit} className="space-y-5 pb-safe-bottom">
-                <div className="space-y-2"><label className="text-sm text-white/60 font-medium ml-1">Title</label><input required type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Cyberpunk Cat" className="glass-input w-full rounded-xl px-4 py-3 focus:outline-none focus:border-[#547EAE]/50 transition-colors text-[16px] md:text-sm" /></div>
-                
-                <div className="space-y-2">
-                  <label className="text-sm text-white/60 font-medium ml-1">Category</label>
+            <div data-lenis-prevent className="glass-panel w-full md:max-w-lg max-h-[90vh] overflow-y-auto rounded-t-3xl md:rounded-3xl p-6 md:p-8 relative">
+              <button onClick={onClose} className="absolute top-4 right-4 p-2 text-white/50 hover:text-white"><X size={24} /></button>
+              <h2 className="text-xl font-bold font-display mb-6"> {initialData ? 'Edit Prompt' : 'Add to Vault'} </h2>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div><label className="text-xs text-white/40 uppercase font-black ml-1">Title</label><input required type="text" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Cyberpunk Cat" className="glass-input w-full rounded-xl px-4 py-3 focus:outline-none text-sm" /></div>
+                <div>
+                  <label className="text-xs text-white/40 uppercase font-black ml-1">Engine</label>
                   <div className="flex gap-2 flex-wrap">
-                    {['NanoBanana', 'Midjourney', 'Seedream'].map((cat) => {
-                       const isSelected = category === cat;
-                       let activeClass = isSelected ? (cat === 'NanoBanana' ? 'bg-yellow-400 border-yellow-400 text-black' : cat === 'Midjourney' ? 'bg-blue-400 border-blue-400 text-black' : 'bg-green-400 border-green-400 text-black') : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10';
-                       return <button key={cat} type="button" onClick={() => setCategory(cat)} className={`px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all border ${activeClass}`}>{cat}</button>;
-                    })}
+                    {['NanoBanana', 'Midjourney', 'Seedream'].map((cat) => (
+                       <button key={cat} type="button" onClick={() => setCategory(cat)} className={`px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${category === cat ? 'bg-white text-black border-white' : 'bg-white/5 border-white/10 text-white/50'}`}>{cat}</button>
+                    ))}
                   </div>
                 </div>
-
-                <div className="space-y-3">
-                  <label className="text-sm text-white/60 font-medium ml-1">Image (4:5)</label>
-                  <div className="flex gap-2 mb-2"><button type="button" onClick={() => setImageMode('upload')} className={`text-xs font-bold px-3 py-1.5 rounded-lg ${imageMode === 'upload' ? 'bg-[#547EAE] text-white' : 'text-white/50'}`}>Upload</button><button type="button" onClick={() => setImageMode('link')} className={`text-xs font-bold px-3 py-1.5 rounded-lg ${imageMode === 'link' ? 'bg-[#547EAE] text-white' : 'text-white/50'}`}>URL</button></div>
+                <div className="space-y-2">
+                  <div className="flex gap-2"><button type="button" onClick={() => setImageMode('upload')} className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-lg ${imageMode === 'upload' ? 'bg-[#547EAE] text-white' : 'text-white/30'}`}>Upload</button><button type="button" onClick={() => setImageMode('link')} className={`text-[10px] font-black uppercase px-3 py-1.5 rounded-lg ${imageMode === 'link' ? 'bg-[#547EAE] text-white' : 'text-white/30'}`}>URL</button></div>
                   {imageMode === 'upload' ? (
-                     <div onClick={() => fileInputRef.current?.click()} className="group relative w-full aspect-[4/5] max-h-[200px] rounded-xl border-2 border-dashed border-white/10 hover:border-[#547EAE]/50 bg-white/5 flex flex-col items-center justify-center cursor-pointer overflow-hidden active:scale-[0.99] transition-transform">
-                      {previewUrl ? <img src={previewUrl} className="w-full h-full object-cover opacity-60" /> : <div className="flex flex-col items-center"><Upload size={24} /><span className="text-xs font-bold mt-2">Click to Upload</span></div>}
+                     <div onClick={() => fileInputRef.current?.click()} className="group relative w-full aspect-[4/5] max-h-[160px] rounded-xl border-2 border-dashed border-white/10 bg-white/5 flex flex-col items-center justify-center cursor-pointer overflow-hidden">
+                      {previewUrl ? <img src={previewUrl} className="w-full h-full object-cover" /> : <div className="flex flex-col items-center"><Upload size={20} className="text-white/30" /><span className="text-[10px] font-black mt-2 text-white/30">CLICK TO UPLOAD</span></div>}
                       <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
                      </div>
                   ) : (
-                    <input type="url" value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setPreviewUrl(e.target.value); }} placeholder="https://..." className="glass-input w-full rounded-xl px-4 py-3 text-[16px] md:text-sm" />
+                    <input type="url" value={imageUrl} onChange={(e) => { setImageUrl(e.target.value); setPreviewUrl(e.target.value); }} placeholder="https://..." className="glass-input w-full rounded-xl px-4 py-3 text-sm" />
                   )}
                 </div>
-
-                <div className="space-y-2"><label className="text-sm text-white/60 font-medium ml-1">Prompt</label><textarea required value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={5} className="glass-input w-full rounded-xl px-4 py-3 focus:outline-none focus:border-[#547EAE]/50 resize-none text-[16px] md:text-sm" /></div>
-                
-                <div className="flex gap-3 mt-4">
-                  {initialData && <Button type="button" variant="danger" onClick={async () => { if(confirm('Delete?')) { setIsDeleting(true); await onDelete(initialData.id).catch(() => {}); onClose(); } }} disabled={isDeleting} className="w-12 px-0"><Trash2 size={20} /></Button>}
-                  <Button type="submit" fullWidth disabled={isSaving}>
-                    {isSaving ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="animate-spin" size={18} />
-                        <span>
-                           {savingStatus === 'uploading' && 'Uploading Image...'}
-                           {savingStatus === 'saving' && 'Saving Data...'}
-                           {savingStatus === 'syncing' && 'Syncing Vault...'}
-                           {savingStatus === 'starting' && 'Processing...'}
-                        </span>
-                      </div>
-                    ) : (initialData ? 'Update Vault' : 'Save to Vault')}
-                  </Button>
+                <div><label className="text-xs text-white/40 uppercase font-black ml-1">Prompt</label><textarea required value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={4} className="glass-input w-full rounded-xl px-4 py-3 focus:outline-none resize-none text-sm" /></div>
+                <div className="flex gap-3 pt-2">
+                  {initialData && <Button type="button" variant="danger" onClick={() => { if(confirm('Delete?')) { onDelete(initialData.id); onClose(); } }} className="w-12 px-0"><Trash2 size={20} /></Button>}
+                  <Button type="submit" fullWidth disabled={isSaving}>{isSaving ? <Loader2 className="animate-spin" size={18} /> : (initialData ? 'Update Vault' : 'Save to Vault')}</Button>
                 </div>
               </form>
             </div>
@@ -664,18 +427,7 @@ grant all on table storage.objects to authenticated;
 
       const FullView = ({ data, isOwner, onBack, onEdit }) => {
         const [copied, setCopied] = useState(false);
-        const [shareCopied, setShareCopied] = useState(false);
         const { addToast } = useToast();
-
-        const getDotColor = (c) => {
-          switch(c) {
-            case 'NanoBanana': return 'bg-[#FFD700] shadow-[0_0_8px_rgba(255,215,0,0.5)]';
-            case 'Midjourney': return 'bg-[#00BFFF] shadow-[0_0_8px_rgba(0,191,255,0.5)]';
-            case 'Seedream': return 'bg-[#00FA9A] shadow-[0_0_8px_rgba(0,250,154,0.5)]';
-            default: return 'bg-white';
-          }
-        };
-
         const handleCopy = () => {
           navigator.clipboard.writeText(data.prompt);
           setCopied(true);
@@ -683,373 +435,187 @@ grant all on table storage.objects to authenticated;
           setTimeout(() => setCopied(false), 2000);
         };
 
-        const handleShare = () => {
-          const encoded = encodeShareData(data);
-          if (!encoded) return;
-          const url = `${window.location.origin}${window.location.pathname}#/share/${encoded}`;
-          navigator.clipboard.writeText(url).then(() => {
-            setShareCopied(true);
-            addToast("Share link copied!");
-            setTimeout(() => setShareCopied(false), 2000);
-          });
+        const getDotColor = (c) => {
+          if (c === 'NanoBanana') return 'bg-[#FFD700]';
+          if (c === 'Midjourney') return 'bg-[#00BFFF]';
+          return 'bg-[#00FA9A]';
         };
 
         return (
           <div data-lenis-prevent className="fixed inset-0 z-[100] bg-black text-white overflow-y-auto">
-             {/* Floating Buttons Container (No visual bar background) */}
              <div className="fixed top-0 left-0 right-0 z-50 px-4 md:px-8 flex items-center justify-between pt-[calc(0.75rem+env(safe-area-inset-top))] h-[72px] md:h-[88px] pointer-events-none">
-                <div className="flex items-center pointer-events-auto">
-                  <button 
-                    onClick={onBack} 
-                    className="group glass-element p-2.5 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all active:scale-90 border border-white/5"
-                    aria-label="Go back"
-                  >
-                    <ChevronLeft size={22} className="group-hover:-translate-x-0.5 transition-transform" />
-                  </button>
-                </div>
-                
-                <div className="flex items-center justify-end gap-2 pointer-events-auto">
-                  {isOwner && (
-                    <>
-                      <button 
-                        onClick={onEdit} 
-                        className="glass-element p-2.5 rounded-xl text-white/70 hover:text-white hover:bg-[#547EAE]/20 transition-all active:scale-90 border border-white/5"
-                        aria-label="Edit prompt"
-                      >
-                        <Pencil size={18} />
-                      </button>
-                      <button 
-                        onClick={handleShare}
-                        className={`glass-element p-2.5 rounded-xl transition-all active:scale-90 border border-white/5 ${shareCopied ? 'bg-white text-black' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
-                        aria-label="Share prompt"
-                      >
-                        {shareCopied ? <Check size={18} /> : <Share2 size={18} />}
-                      </button>
-                    </>
-                  )}
+                <button onClick={onBack} className="pointer-events-auto group glass-element p-2.5 rounded-xl border border-white/5"><ChevronLeft size={22} /></button>
+                <div className="flex items-center gap-2 pointer-events-auto">
+                  {isOwner && <button onClick={onEdit} className="glass-element p-2.5 rounded-xl border border-white/5"><Pencil size={18} /></button>}
                 </div>
              </div>
-
-             <div className="max-w-xl mx-auto px-4 pb-[calc(8rem+env(safe-area-inset-bottom))] pt-6 flex flex-col items-center w-full">
-                
-                {/* Main Image */}
-                <div className="relative w-full aspect-[4/5] rounded-[24px] md:rounded-[32px] overflow-hidden bg-[#111] border border-white/10 shadow-2xl mb-6 md:mb-8">
+             <div className="max-w-xl mx-auto px-4 pb-48 pt-6 flex flex-col items-center w-full">
+                <div className="relative w-full aspect-[4/5] rounded-[32px] overflow-hidden bg-[#111] border border-white/10 shadow-2xl mb-8">
                   <img src={data.imageUrl} className="w-full h-full object-cover animate-in fade-in zoom-in-95 duration-700" />
                 </div>
-
-                {/* Content Container */}
-                <div className="w-full flex flex-col gap-4 md:gap-5 px-1 min-w-0">
-                   {/* Title */}
-                   <h1 className="text-2xl md:text-4xl font-black font-display text-white leading-tight tracking-tight text-left break-all uppercase">{data.title}</h1>
+                <div className="w-full flex flex-col items-start gap-4">
+                   <h1 className="text-2xl md:text-4xl font-black font-display text-white tracking-tight leading-[1.1]">{data.title}</h1>
                    
-                   {/* Meta Tags */}
-                   <div className="flex flex-wrap items-center gap-3">
-                      <div className="glass-element flex items-center gap-2 px-3 py-2 rounded-full border border-white/10">
-                         <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getDotColor(data.category || 'NanoBanana')}`}></div>
-                         <span className="text-[10px] font-black uppercase tracking-widest text-white/90 font-display whitespace-nowrap">{data.category || 'NanoBanana'}</span>
-                      </div>
+                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-black border border-white/10 self-start">
+                      <div className={`w-1.5 h-1.5 rounded-full ${getDotColor(data.category)}`}></div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-white">{data.category}</span>
                    </div>
 
-                   {/* Prompt Box */}
-                   <div className="w-full bg-[#111] border border-white/5 rounded-3xl p-5 md:p-8 mt-2 relative min-w-0 overflow-hidden group/box">
-                      <div className="absolute top-0 left-0 w-1 h-full bg-[#547EAE]/40 group-hover/box:bg-[#547EAE] transition-colors duration-500"></div>
-                      <p className="text-sm md:text-lg text-gray-400 font-medium leading-relaxed whitespace-pre-wrap select-text break-all">
-                        {data.prompt}
-                      </p>
+                   <div className="w-full bg-[#151515] border border-white/5 rounded-[28px] p-6 md:p-10 mt-2 relative overflow-hidden group/box">
+                      <p className="text-sm md:text-lg text-white font-medium leading-relaxed break-all select-text whitespace-pre-wrap">{data.prompt}</p>
                    </div>
                 </div>
              </div>
-
-             {/* Sticky Action Footer */}
-             <div className="fixed bottom-0 left-0 right-0 p-4 md:p-6 bg-gradient-to-t from-black via-black/90 to-transparent z-50 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
-                <div className="max-w-xl mx-auto flex gap-4">
-                   <Button onClick={handleCopy} fullWidth variant="primary" className="h-16 text-base font-black shadow-lg shadow-[#547EAE]/30 rounded-2xl hover:scale-[1.02] active:scale-95 transition-all uppercase tracking-tighter">
-                      {copied ? 'Copied to Clipboard!' : 'Copy Prompt'}
-                   </Button>
-                </div>
+             <div className="fixed bottom-0 left-0 right-0 p-6 bg-gradient-to-t from-black via-black/90 to-transparent z-50 flex justify-center">
+                <button 
+                  onClick={handleCopy} 
+                  className="w-full max-w-xl bg-[#5b7da0] hover:bg-[#6c8ab0] text-white font-bold py-4 rounded-full transition-all active:scale-[0.98] shadow-2xl text-lg md:text-xl"
+                >
+                  {copied ? 'Copied!' : 'Copy prompt'}
+                </button>
              </div>
           </div>
         );
       };
 
-      // FIX: Moved MainApp logic outside of App to prevent infinite re-rendering (flickering)
       const MainApp = () => {
-        // Initialize state based on URL hash to prevent flash of homepage
-        const [sharedData, setSharedData] = useState(() => {
-          const hash = window.location.hash;
-          if (hash.startsWith('#/share/')) {
-            return decodeShareData(hash.split('#/share/')[1]);
-          }
-          return null;
-        });
-
-        const [view, setView] = useState(() => {
-          const hash = window.location.hash;
-          if (hash.startsWith('#/share/') && decodeShareData(hash.split('#/share/')[1])) {
-            return 'shared';
-          }
-          return 'gallery';
-        });
-
         const [prompts, setPrompts] = useState([]);
         const [loading, setLoading] = useState(true);
-        const [error, setError] = useState(null);
         const [dbError, setDbError] = useState(null);
         const [selectedPrompt, setSelectedPrompt] = useState(null);
-        
         const [isAddModalOpen, setIsAddModalOpen] = useState(false);
         const [editingPrompt, setEditingPrompt] = useState(null);
-        
-        // Navigation State (active category acts as "page")
-        const [activeCategory, setActiveCategory] = useState('All');
+        const [activeCategory, setActiveCategory] = useState('Home');
         const [searchQuery, setSearchQuery] = useState('');
-        
+        const [view, setView] = useState('gallery');
         const { addToast } = useToast();
-
-        // Theme Configuration
-        const themeColors = {
-          'All': '#547EAE', // Default/Home
-          'NanoBanana': '#FFD700', // Yellow
-          'Midjourney': '#00BFFF', // Blue
-          'Seedream': '#00FA9A' // Green
-        };
-        const currentTheme = themeColors[activeCategory] || '#547EAE';
 
         useEffect(() => {
           const init = async () => {
             setLoading(true);
-            
-            // Check DB Health First
             const health = await checkDatabaseHealth();
-            if (!health.healthy) {
-              setDbError(health.error); 
-            }
-
+            if (!health.healthy) setDbError(health.error);
             try {
               const data = await fetchPrompts();
               setPrompts(data);
-              checkHash(data);
-            } catch (err) {
-              if (!health.healthy) {
-                console.warn("Fetch failed due to DB schema");
-              } else {
-                setError(err.message);
+              const hash = window.location.hash;
+              if (hash.startsWith('#/view/')) {
+                const found = data.find(p => p.id === hash.split('#/view/')[1]);
+                if (found) { setSelectedPrompt(found); setView('full'); }
+              } else if (hash.startsWith('#/share/')) {
+                const decoded = decodeShareData(hash.split('#/share/')[1]);
+                if (decoded) { setSelectedPrompt(decoded); setView('shared'); }
               }
-            } finally {
-              setLoading(false);
-            }
+            } catch (err) { console.error(err); } finally { setLoading(false); }
           };
-
-          const checkHash = (currentPrompts) => {
-            const hash = window.location.hash;
-            if (hash.startsWith('#/share/')) {
-              // Redundant if handled in initial state, but good for safety
-              const decoded = decodeShareData(hash.split('#/share/')[1]);
-              if (decoded) { setSharedData(decoded); setView('shared'); } 
-            } else if (hash.startsWith('#/view/')) {
-              const id = hash.split('#/view/')[1];
-              const found = currentPrompts.find(p => p.id === id);
-              if (found) { setSelectedPrompt(found); setView('full'); }
-            }
-          };
-
           init();
 
-          // Smooth Scroll
           const lenis = new Lenis({ duration: 1.2, smoothWheel: true });
           function raf(time) { lenis.raf(time); requestAnimationFrame(raf); }
           requestAnimationFrame(raf);
-
           return () => lenis.destroy();
         }, []);
 
-        const handleSave = async (promptData, imageFile, onStatusUpdate) => { 
-          try {
-            let finalImageUrl = promptData.imageUrl;
-            
-            // Handle Image Upload if file exists
-            if (imageFile) {
-                 if (onStatusUpdate) onStatusUpdate('uploading');
-                 try {
-                     finalImageUrl = await uploadImageToSupabase(imageFile);
-                 } catch (uploadErr) {
-                     const msg = (uploadErr.message || "").toLowerCase();
-                     if (msg.includes('storage permission') || msg.includes('row-level security') || msg.includes('403')) {
-                         setDbError("Storage Permissions Denied. Please run the repair script to fix your bucket policies.");
-                         throw new Error("Storage Permission Denied. Run the repair script.");
-                     }
-                     throw uploadErr;
-                 }
-            }
-
-            if (onStatusUpdate) onStatusUpdate('saving');
-            const payload = {
-                ...promptData,
-                imageUrl: finalImageUrl
-            };
-
-            await savePromptToSupabase(payload);
-            
-            if (onStatusUpdate) onStatusUpdate('syncing');
-            const data = await fetchPrompts(); 
-            setPrompts(data); 
-          } catch (err) {
-              console.error(err);
-              const msg = (err.message || "Unknown error").toLowerCase();
-              if (msg.includes('column') || msg.includes('does not exist') || msg.includes('42703')) {
-                addToast("⚠️ DB Schema Error: Columns missing.", 'error');
-                setDbError(err.message);
-              } else if (msg.includes('policy') || msg.includes('permission') || msg.includes('42501')) {
-                addToast("⚠️ DB Permission Error: RLS Policy violation.", 'error');
-                setDbError("Row-Level Security (RLS) Policy Violation. Please run the repair script.");
-              } else {
-                // If it's the storage permission error we rethrew, it's already setDbError, but we might want to log it
-              }
-              throw err; 
-          }
+        const handleSave = async (data, file) => {
+          let finalUrl = data.imageUrl;
+          if (file) finalUrl = await uploadImageToSupabase(file);
+          await savePromptToSupabase({ ...data, imageUrl: finalUrl });
+          setPrompts(await fetchPrompts());
         };
 
-        const handleDelete = async (id) => { 
-          try {
-              await deletePromptFromSupabase(id); 
-              const data = await fetchPrompts(); 
-              setPrompts(data); 
-          } catch (err) {
-              console.error(err);
-              const msg = (err.message || "Unknown error").toLowerCase();
-              if (msg.includes('policy') || msg.includes('permission') || msg.includes('42501')) {
-                setDbError("Row-Level Security (RLS) Policy Violation. Please run the repair script.");
-              }
-              throw err;
-          }
+        const handleDelete = async (id) => {
+          await deletePromptFromSupabase(id);
+          setPrompts(await fetchPrompts());
         };
 
-        const filtered = prompts.filter(p => (activeCategory === 'All' || (p.category || 'NanoBanana') === activeCategory) && (p.title.toLowerCase().includes(searchQuery.toLowerCase())));
+        const filtered = prompts.filter(p => (activeCategory === 'Home' || p.category === activeCategory) && (p.title.toLowerCase().includes(searchQuery.toLowerCase())));
+        const themeColors = { 'Home': '#547EAE', 'NanoBanana': '#FFD700', 'Midjourney': '#00BFFF', 'Seedream': '#00FA9A' };
+        const currentTheme = themeColors[activeCategory] || '#547EAE';
 
         return (
-          <div className="min-h-screen relative text-white selection:text-white">
-            <style>{`::selection { background-color: ${currentTheme}; color: black; }`}</style>
-
-            {/* Database Repair Modal */}
+          <div className="min-h-screen relative text-white selection:bg-[#547EAE] selection:text-black">
             <RepairModal isOpen={!!dbError} onClose={() => setDbError(null)} errorMsg={dbError} />
-
-            {/* Dynamic Background with Theme Color */}
-            <div className="fixed inset-0 z-[-1] bg-[#020202] transition-colors duration-700">
-              <div 
-                   className="absolute top-[-20%] left-[-20%] w-[80vw] h-[80vw] blur-[120px] transition-all duration-1000 ease-in-out" 
-                   style={{ backgroundColor: currentTheme, opacity: 0.04 }}
-              />
-              <div 
-                   className="absolute bottom-[-20%] right-[-20%] w-[80vw] h-[80vw] blur-[120px] transition-all duration-1000 ease-in-out" 
-                   style={{ backgroundColor: currentTheme, opacity: 0.02 }}
-              />
+            <div className="fixed inset-0 z-[-1] bg-[#020202]">
+              <div className="absolute top-[-20%] left-[-20%] w-[80vw] h-[80vw] blur-[120px] opacity-[0.04]" style={{ backgroundColor: currentTheme }} />
             </div>
 
-            {view === 'shared' && sharedData ? <FullView data={sharedData} isOwner={false} onBack={() => { window.location.hash = ''; setView('gallery'); }} /> : 
-              view === 'full' && selectedPrompt ? <><FullView data={selectedPrompt} isOwner={true} onBack={() => {window.location.hash=''; setView('gallery');}} onEdit={() => { setEditingPrompt(selectedPrompt); setIsAddModalOpen(true); }} /><AddModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSave={handleSave} onDelete={handleDelete} initialData={editingPrompt} /></> : (
+            {view === 'gallery' ? (
               <>
-                <header className="fixed top-0 left-0 right-0 z-40 flex justify-center pointer-events-none px-4 pt-[calc(1rem+env(safe-area-inset-top))] md:pt-6">
-                  <div className="pointer-events-auto w-full max-w-6xl bg-black/40 backdrop-blur-[32px] saturate-150 border border-white/10 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.6)] rounded-full py-3 px-2 pl-3 md:pl-4 pr-2 md:pr-2 flex items-center justify-between transition-all duration-500 hover:bg-black/60 hover:border-white/20 ring-1 ring-white/5 group">
-                    
-                    {/* Left: Logo */}
-                    <div className="flex-1 flex items-center justify-start gap-3 md:gap-4 min-w-0">
-                      <img src="./logo.svg" alt="Logo" className="w-10 h-10 group-hover:scale-110 transition-transform duration-300 drop-shadow-lg" />
-                      <h1 className="hidden lg:block text-xl md:text-2xl font-extrabold tracking-tighter text-white truncate" style={{ fontFamily: 'Slackey, sans-serif' }}>
-                        Wavy<span style={{ color: '#547EAE' }}>Prompts</span>
-                      </h1>
+                <header className="fixed top-0 left-0 right-0 z-40 flex justify-center pointer-events-none px-4 pt-6">
+                  <div className="pointer-events-auto w-full max-w-6xl bg-black/40 backdrop-blur-[32px] border border-white/10 shadow-2xl rounded-full py-2.5 px-2 flex items-center justify-between">
+                    <div className="flex-1 flex items-center justify-start gap-3 pl-3">
+                      <img src="./logo.svg" className="w-8 h-8" alt="Logo" />
+                      <h1 className="hidden lg:block text-2xl font-extrabold tracking-tighter" style={{ fontFamily: 'Slackey' }}>Wavy<span style={{ color: '#547EAE' }}>Prompts</span></h1>
                     </div>
-
-                    {/* Center: Navigation */}
-                    <nav className="flex justify-center items-center overflow-hidden mx-2 md:mx-4 shrink-0">
-                      <div className="flex items-center gap-1 md:gap-2 overflow-x-auto no-scrollbar mask-fade px-2 py-1">
-                        {[
-                          { id: 'All', label: 'Home' },
-                          { id: 'NanoBanana', label: 'NanoBanana' },
-                          { id: 'Midjourney', label: 'Midjourney' },
-                          { id: 'Seedream', label: 'Seedream' }
-                        ].map((item) => {
-                           const isActive = activeCategory === item.id;
-                           return (
-                             <button
-                               key={item.id}
-                               onClick={() => setActiveCategory(item.id)}
-                               className={`px-3 py-1.5 md:px-4 md:py-2 rounded-full text-[10px] md:text-xs font-bold uppercase tracking-widest transition-all duration-300 whitespace-nowrap ${isActive ? 'shadow-[0_0_15px_rgba(0,0,0,0.3)] text-black' : 'hover:bg-white/5 text-white/50 hover:text-white'}`}
-                               style={isActive ? { backgroundColor: currentTheme, color: '#000000', boxShadow: `0 0 15px ${currentTheme}60` } : {}}
-                             >
-                               {item.label}
-                             </button>
-                           );
-                        })}
-                      </div>
+                    <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar px-2">
+                      {['Home', 'NanoBanana', 'Midjourney', 'Seedream'].map(cat => (
+                        <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-3 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${activeCategory === cat ? 'text-black' : 'text-white/40 hover:text-white'}`} style={activeCategory === cat ? { backgroundColor: currentTheme } : {}}>{cat}</button>
+                      ))}
                     </nav>
-
-                    {/* Right: Add Button */}
-                    <div className="flex-1 flex items-center justify-end min-w-0">
-                      <button onClick={() => { setEditingPrompt(null); setIsAddModalOpen(true); }} className="flex items-center gap-2 px-5 py-3 rounded-full bg-white text-black font-bold text-xs uppercase tracking-wider hover:bg-[#547EAE] hover:text-white transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)] active:scale-95 active:bg-[#547EAE] active:text-white whitespace-nowrap" style={{ '--hover-color': currentTheme }}>
-                        <Plus size={16} strokeWidth={3} />
-                        <span className="hidden md:inline">ADD PROMPT</span>
-                        <span className="md:hidden">ADD</span>
+                    <div className="flex-1 flex items-center justify-end pr-1">
+                      <button onClick={() => { setEditingPrompt(null); setIsAddModalOpen(true); }} className="flex items-center gap-1.5 px-4 py-2.5 rounded-full bg-white text-black font-black text-[10px] uppercase tracking-wider hover:bg-[#547EAE] hover:text-white transition-all">
+                        <Plus size={14} strokeWidth={3} /><span className="hidden md:inline">ADD PROMPT</span><span className="md:hidden">ADD</span>
                       </button>
                     </div>
                   </div>
                 </header>
 
-                <main className="pt-24 md:pt-28 pb-20 px-4 md:px-6 z-10 relative max-w-7xl mx-auto">
-                  
-                  {/* HERO SECTION */}
+                <main className="pt-24 pb-20 px-4 md:px-8 max-w-7xl mx-auto z-10 relative">
                   <HeroSection prompts={prompts} />
-
-                  {/* Search Bar - Full Width Centered */}
-                  <div className="mb-8 md:mb-10 max-w-2xl mx-auto w-full">
-                    <div className="relative w-full group">
-                      <Search size={16} className="absolute left-4 top-3 text-white/30 group-focus-within:opacity-100 transition-all duration-300" style={{ color: 'rgba(255,255,255,0.3)' }} />
-                      <input 
-                        type="text" 
-                        value={searchQuery} 
-                        onChange={(e) => setSearchQuery(e.target.value)} 
-                        placeholder={`Search ${activeCategory === 'All' ? 'all' : activeCategory} prompts...`} 
-                        className="w-full bg-white/5 border border-white/10 text-white rounded-full pl-10 pr-4 py-3 text-sm focus:outline-none focus:bg-white/10 transition-all text-[16px] md:text-sm shadow-lg" 
-                        style={{ outlineColor: currentTheme }}
-                        onFocus={(e) => e.target.style.borderColor = currentTheme}
-                        onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.1)'}
-                      />
-                    </div>
+                  <div className="mb-12 max-w-xl mx-auto w-full relative group">
+                      <Search size={16} className="absolute left-4 top-4 text-white/20 group-focus-within:text-[#547EAE] transition-colors" />
+                      <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search the vault..." className="w-full bg-white/5 border border-white/10 text-white rounded-full pl-11 pr-4 py-4 text-sm focus:outline-none focus:bg-white/10 focus:ring-2 ring-[#547EAE]/30 transition-all shadow-lg" />
                   </div>
 
                   {loading ? (
-                    <div className="flex flex-col items-center justify-center py-20">
-                      <Loader2 size={40} className="animate-spin mb-4" style={{ color: currentTheme }} />
-                      <p className="text-white/50 text-sm font-display tracking-widest uppercase">Syncing Vault...</p>
-                    </div>
+                    <div className="flex flex-col items-center justify-center py-20"><Loader2 size={40} className="animate-spin mb-4" style={{ color: currentTheme }} /></div>
                   ) : filtered.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-center">
-                      <div className="w-24 h-24 rounded-full bg-white/5 border border-white/10 flex items-center justify-center mb-6"><Plus size={28} className="text-white/20" /></div>
-                      <h2 className="text-xl font-display text-white/80 mb-2">Vault Empty</h2>
-                      <p className="text-white/40 max-w-xs mx-auto mb-8">Start your collection by adding your first AI generation prompt.</p>
-                    </div>
+                    <div className="text-center py-20 opacity-30 text-lg font-black uppercase tracking-widest">Vault Empty</div>
                   ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                      {filtered.map((prompt) => (<PromptCard key={prompt.id} data={prompt} onClick={() => { window.location.hash = `#/view/${prompt.id}`; setSelectedPrompt(prompt); setView('full'); }} onEdit={() => { setEditingPrompt(prompt); setIsAddModalOpen(true); }} />))}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                      {filtered.map((p) => (
+                        <PromptCard 
+                          key={p.id} 
+                          data={p} 
+                          onClick={() => { window.location.hash = `#/view/${p.id}`; setSelectedPrompt(p); setView('full'); }} 
+                          onEdit={() => { setEditingPrompt(p); setIsAddModalOpen(true); }} 
+                        />
+                      ))}
                     </div>
                   )}
                 </main>
                 <AddModal isOpen={isAddModalOpen} onClose={() => setIsAddModalOpen(false)} onSave={handleSave} onDelete={handleDelete} initialData={editingPrompt} />
               </>
+            ) : (
+              <FullView data={selectedPrompt} isOwner={view==='full'} onBack={() => { window.location.hash = ''; setView('gallery'); }} onEdit={() => { setEditingPrompt(selectedPrompt); setIsAddModalOpen(true); }} />
             )}
           </div>
         );
       };
 
-      const App = () => {
+      const RepairModal = ({ isOpen, onClose, errorMsg }) => {
+        if (!isOpen) return null;
         return (
-          <ToastProvider>
-            <MainApp />
-          </ToastProvider>
+          <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" />
+            <div className="glass-panel w-full max-w-xl rounded-3xl p-8 relative border border-red-500/20">
+              <div className="flex items-center gap-4 mb-6">
+                <Database className="text-red-400" size={24} />
+                <h2 className="text-xl font-bold font-display uppercase tracking-tight">Database Fix Required</h2>
+              </div>
+              <p className="text-white/60 text-sm mb-4">Run this SQL in your Supabase Editor:</p>
+              <pre className="bg-black/50 p-4 rounded-xl text-[10px] font-mono overflow-auto h-48 border border-white/5 mb-6">{REPAIR_SQL}</pre>
+              <div className="flex justify-end gap-3">
+                <Button onClick={() => navigator.clipboard.writeText(REPAIR_SQL)} variant="secondary" className="px-4 py-2 text-xs">Copy SQL</Button>
+                <Button onClick={() => window.location.reload()} className="px-4 py-2 text-xs">Reload App</Button>
+              </div>
+            </div>
+          </div>
         );
       };
 
-      const root = ReactDOM.createRoot(document.getElementById('root'));
-      root.render(<App />);
+      const App = () => (<ToastProvider><MainApp /></ToastProvider>);
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
   </body>
 </html>
