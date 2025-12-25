@@ -1,0 +1,1 @@
+// Logic moved to index.html for drag-and-drop deployment compatibility.
