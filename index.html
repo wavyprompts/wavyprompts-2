@@ -250,7 +250,15 @@
     <body>
 
   <!-- COMING SOON WALL -->
-  <div id="coming-wall" class="coming-wall">
+  <div id="coming-wall" class="coming-wall" style="display:none;">
+
+    <script>
+  if (localStorage.getItem("wavy_admin") !== "1") {
+    document.getElementById("coming-wall").style.display = "flex";
+  }
+</script>
+
+
 
     <div class="cs-header">
       <div class="cs-brand">
