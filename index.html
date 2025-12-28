@@ -205,14 +205,19 @@
 
 .cs-center h1 {
   font-family: 'Milker','Unbounded','Syne',sans-serif;
-  font-size: clamp(3rem, 7vw, 6rem);
-  line-height: 0.9;
-  letter-spacing: -0.06em;
+  font-size: clamp(3.5rem, 8vw, 6.8rem);
+  line-height: 0.85;
+  letter-spacing: -0.08em;
   margin: 0;
+  font-weight: 900;
+  text-transform: uppercase;
+  display: flex;
+  flex-direction: column;
 }
 
+
 .cs-center h1 .muted {
-  opacity: 0.9;
+  opacity: 1;
 }
 
 .cs-center p {
@@ -270,9 +275,10 @@
     <div class="cs-center">
       <h1>
         <span>STAY WAVY</span>
-        <span class="muted">PROMPT SMARTER</span>
+        <span>PROMPT</span>
+        <span>SMARTER</span>
       </h1>
-      <p>Discover and collect the best AI prompts in your personal vault.</p>
+      
       <span class="coming">COMING SOON</span>
     </div>
 
@@ -761,8 +767,11 @@ grant all on table storage.objects to authenticated;
       ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
     <script>
-  if (localStorage.getItem("uzair2643") === "1") {
-    document.getElementById("coming-wall")?.remove();
+  const isAdmin = localStorage.getItem("wavy_admin") === "1";
+  const isSharedLink = window.location.hash.startsWith("#/share/");
+
+  if (!isAdmin && !isSharedLink) {
+    document.getElementById("coming-wall").style.display = "flex";
   }
 </script>
 
