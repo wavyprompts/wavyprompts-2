@@ -767,16 +767,29 @@ grant all on table storage.objects to authenticated;
       ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
     <script>
-  setTimeout(() => {
-    const isAdmin = localStorage.getItem("wavy_admin") === "1";
-    const hash = window.location.hash || "";
-    const isSharedLink = hash.startsWith("#/share/");
+  (function () {
+    const wall = document.getElementById("coming-wall");
 
-    if (!isAdmin && !isSharedLink) {
-      document.getElementById("coming-wall").style.display = "flex";
+    function updateWall() {
+      const isAdmin = localStorage.getItem("wavy_admin") === "1";
+      const hash = window.location.hash || "";
+      const isSharedLink = hash.startsWith("#/share/");
+
+      if (isAdmin || isSharedLink) {
+        wall.style.display = "none";
+      } else {
+        wall.style.display = "flex";
+      }
     }
-  }, 0);
+
+    // Run immediately
+    updateWall();
+
+    // Run again whenever hash changes (CRITICAL)
+    window.addEventListener("hashchange", updateWall);
+  })();
 </script>
+
 
 
   </body>
