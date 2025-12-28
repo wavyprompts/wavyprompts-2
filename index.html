@@ -151,10 +151,130 @@
         0% { transform: translateY(-50%); }
         100% { transform: translateY(0); }
       }
+      /* ===== COMING SOON WALL ===== */
+.coming-wall {
+  position: fixed;
+  inset: 0;
+  background: #020202;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  color: white;
+}
+
+/* Header */
+.cs-header {
+  height: 72px;
+  margin: 16px;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(30px);
+  border: 1px solid rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  padding: 0 28px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.6);
+}
+
+.cs-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-weight: 800;
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+.cs-brand img {
+  width: 40px;
+  height: 40px;
+}
+
+.cs-brand .blue {
+  color: #547EAE;
+}
+
+/* Center */
+.cs-center {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 0 6vw;
+}
+
+.cs-center h1 {
+  font-family: 'Milker','Unbounded','Syne',sans-serif;
+  font-size: clamp(3rem, 7vw, 6rem);
+  line-height: 0.9;
+  letter-spacing: -0.06em;
+  margin: 0;
+}
+
+.cs-center h1 .muted {
+  opacity: 0.9;
+}
+
+.cs-center p {
+  margin-top: 18px;
+  max-width: 420px;
+  font-size: 14px;
+  opacity: 0.45;
+}
+
+.cs-center .coming {
+  margin-top: 40px;
+  font-size: 11px;
+  letter-spacing: 0.3em;
+  opacity: 0.4;
+}
+
     </style>
+
+    <script>
+  (function () {
+    const ADMIN_KEY = "wavy_admin";
+    const ADMIN_PASSWORD = "uzair2643";
+
+    const params = new URLSearchParams(window.location.search);
+    const adminParam = params.get("admin");
+
+    if (adminParam && adminParam === ADMIN_PASSWORD) {
+      localStorage.setItem(ADMIN_KEY, "1");
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  })();
+</script>
+
   </head>
-  <body>
+    <body>
+
+  <!-- COMING SOON WALL -->
+  <div id="coming-wall" class="coming-wall">
+
+    <div class="cs-header">
+      <div class="cs-brand">
+        <img src="./logo.svg" alt="WavyPrompts Logo" />
+        <span>Wavy<span class="blue">Prompts</span></span>
+      </div>
+    </div>
+
+    <div class="cs-center">
+      <h1>
+        <span>STAY WAVY</span>
+        <span class="muted">PROMPT SMARTER</span>
+      </h1>
+      <p>Discover and collect the best AI prompts in your personal vault.</p>
+      <span class="coming">COMING SOON</span>
+    </div>
+
+  </div>
+
+  
+
     <div id="root"></div>
+
+
 
     <script type="text/babel" data-presets="react" data-type="module">
       import React, { useState, useEffect, useRef, useContext, createContext } from "https://esm.sh/react@18.2.0";
@@ -632,5 +752,11 @@ grant all on table storage.objects to authenticated;
       const App = () => (<ToastProvider><MainApp /></ToastProvider>);
       ReactDOM.createRoot(document.getElementById('root')).render(<App />);
     </script>
+    <script>
+  if (localStorage.getItem("uzair2643") === "1") {
+    document.getElementById("coming-wall")?.remove();
+  }
+</script>
+
   </body>
 </html>
